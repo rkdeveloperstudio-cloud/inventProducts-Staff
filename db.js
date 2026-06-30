@@ -74,3 +74,24 @@ self.addEventListener("fetch", event => {
       .catch(() => caches.match(event.request))
   );
 });
+
+let db;
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+
+        const request = indexedDB.open("InventoryDB", 1);
+
+        request.onupgradeneeded = function (e) {
+            db = e.target.result;
+            db.createObjectStore("products", { keyPath: "barcode" });
+        };
+
+        request.onsuccess = function (e) {
+            db = e.target.result;
+            resolve(db);
+        };
+
+        request.onerror = reject;
+    });
+}

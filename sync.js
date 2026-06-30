@@ -20,3 +20,26 @@ async function syncData() {
 
     alert("Offline data synced!");
 }
+
+async function downloadOfflineData() {
+
+    await openDB();
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
+        headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY
+        }
+    });
+
+    const data = await res.json();
+
+    const tx = db.transaction("products", "readwrite");
+    const store = tx.objectStore("products");
+
+    data.forEach(item => {
+        store.put(item);
+    });
+
+    alert("Offline data downloaded: " + data.length);
+}

@@ -13,10 +13,24 @@ async function searchByBarcode() {
     if (!barcode) return;
 
     // OFFLINE MODE
-    if (!navigator.onLine) {
-        alert("Offline mode (not connected)");
-        return;
-    }
+   if (!navigator.onLine) {
+
+    await openDB();
+
+    const tx = db.transaction("products", "readonly");
+    const store = tx.objectStore("products");
+
+    const result = await new Promise(resolve => {
+        const req = store.get(barcode);
+
+        req.onsuccess = () => {
+            resolve(req.result ? [req.result] : []);
+        };
+    });
+
+    showResults(result);
+    return;
+}
 
     const url =
         `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand&barcode=eq.${barcode}`;
@@ -39,10 +53,36 @@ async function searchByKeyword() {
     const keyword = document.getElementById("keywordBox").value.trim();
     if (!keyword) return;
 
-    if (!navigator.onLine) {
-        alert("Offline mode not available yet");
-        return;
-    }
+  if (!navigator.onLine) {
+
+    await openDB();
+
+    const tx = db.transaction("products", "readonly");
+    const store = tx.objectStore("products");
+
+    const result = [];
+
+    store.openCursor().onsuccess = function (event) {
+
+        const cursor = event.target.result;
+
+        if (cursor) {
+
+            if (cursor.value.description &&
+                cursor.value.description.toLowerCase()
+                .includes(keyword.toLowerCase())) {
+
+                result.push(cursor.value);
+            }
+
+            cursor.continue();
+        } else {
+            showResults(result);
+        }
+    };
+
+    return;
+}
 
     const url =
         `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand&description=ilike.*${keyword}*`;
