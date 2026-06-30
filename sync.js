@@ -29,7 +29,7 @@ async function downloadOfflineData() {
     status.innerText = "Syncing started...";
     progress.value = 0;
 
-    await openDB();
+    if (!db) await openDB();
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
         headers: {
@@ -43,20 +43,19 @@ async function downloadOfflineData() {
     const tx = db.transaction("products", "readwrite");
     const store = tx.objectStore("products");
 
-    let total = data.length;
-    let count = 0;
+    const total = data.length;
 
-    for (let item of data) {
+    for (let i = 0; i < total; i++) {
 
-        store.put(item);
+        store.put(data[i]);
 
-        count++;
+        const percent = Math.floor(((i + 1) / total) * 100);
 
-        if (count % 500 === 0) {
-            let percent = Math.floor((count / total) * 100);
+        progress.value = percent;
+        status.innerText = `Syncing... ${i + 1} / ${total}`;
 
-            progress.value = percent;
-            status.innerText = `Syncing... ${count}/${total}`;
+        if (i % 50 === 0) {
+            await new Promise(r => setTimeout(r, 1));
         }
     }
 
