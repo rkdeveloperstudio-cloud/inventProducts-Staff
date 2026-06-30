@@ -84,7 +84,10 @@ function openDB() {
 
         request.onupgradeneeded = function (e) {
             db = e.target.result;
-            db.createObjectStore("products", { keyPath: "barcode" });
+
+            db.createObjectStore("products", {
+                keyPath: "barcode"
+            });
         };
 
         request.onsuccess = function (e) {

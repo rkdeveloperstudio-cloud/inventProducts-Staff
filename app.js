@@ -1,3 +1,4 @@
+let db = null;
 console.log("Inventory PWA Loaded - " + new Date().toLocaleString());
 const SUPABASE_URL = "https://ibmwrbpucbbflnxopfwm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlibXdyYnB1Y2JiZmxueG9wZndtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NjczNjgsImV4cCI6MjA5ODI0MzM2OH0.hAf6u1Vb8Z45jC2kCLHI3pZvDk2GMNBWY6mfwcCbUts";
@@ -13,19 +14,17 @@ async function searchByBarcode() {
     if (!barcode) return;
 
     // OFFLINE MODE
-   if (!navigator.onLine) {
+  if (!navigator.onLine) {
 
-    await openDB();
+    if (!db) await openDB();
 
     const tx = db.transaction("products", "readonly");
     const store = tx.objectStore("products");
 
-    const result = await new Promise(resolve => {
-        const req = store.get(barcode);
+    const req = store.get(barcode);
 
-        req.onsuccess = () => {
-            resolve(req.result ? [req.result] : []);
-        };
+    const result = await new Promise(resolve => {
+        req.onsuccess = () => resolve(req.result ? [req.result] : []);
     });
 
     showResults(result);
@@ -53,29 +52,30 @@ async function searchByKeyword() {
     const keyword = document.getElementById("keywordBox").value.trim();
     if (!keyword) return;
 
-  if (!navigator.onLine) {
+ if (!navigator.onLine) {
 
-    await openDB();
+    if (!db) await openDB();
 
     const tx = db.transaction("products", "readonly");
     const store = tx.objectStore("products");
+    const index = store.index("description");
 
     const result = [];
 
-    store.openCursor().onsuccess = function (event) {
-
+    index.openCursor().onsuccess = function (event) {
         const cursor = event.target.result;
 
         if (cursor) {
 
-            if (cursor.value.description &&
-                cursor.value.description.toLowerCase()
+            if (cursor.value.description
+                ?.toLowerCase()
                 .includes(keyword.toLowerCase())) {
 
                 result.push(cursor.value);
             }
 
             cursor.continue();
+
         } else {
             showResults(result);
         }
@@ -226,3 +226,29 @@ window.addEventListener("offline", updateNetStatus);
 
 // run on page load
 updateNetStatus();
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+
+        const request = indexedDB.open("InventoryDB", 1);
+
+        request.onupgradeneeded = function (e) {
+            db = e.target.result;
+
+            const store = db.createObjectStore("products", {
+                keyPath: "barcode"
+            });
+
+            store.createIndex("description", "description", {
+                unique: false
+            });
+        };
+
+        request.onsuccess = function (e) {
+            db = e.target.result;
+            resolve(db);
+        };
+
+        request.onerror = reject;
+    });
+}

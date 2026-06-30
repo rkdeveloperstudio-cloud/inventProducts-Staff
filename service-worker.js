@@ -8,44 +8,27 @@ const STATIC_FILES = [
   "./manifest.json"
 ];
 
-// =====================
-// INSTALL EVENT
-// =====================
+// INSTALL
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(STATIC_FILES);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_FILES))
   );
-
   self.skipWaiting();
 });
 
-// =====================
-// ACTIVATE EVENT (IMPORTANT FOR UPDATES)
-// =====================
+// ACTIVATE
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    })
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => k !== CACHE_NAME ? caches.delete(k) : null))
+    )
   );
-
   self.clients.claim();
 });
 
-// =====================
-// FETCH EVENT (FIXED FOR PWA + 404 ISSUE)
-// =====================
+// FETCH
 self.addEventListener("fetch", event => {
 
-  // Handle navigation (THIS FIXES 404 AFTER INSTALL)
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch("./index.html").catch(() => caches.match("./index.html"))
@@ -53,24 +36,18 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // API requests → always network (IMPORTANT for Supabase)
   if (event.request.url.includes("/rest/v1/")) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // Static assets → cache first with update
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const responseClone = response.clone();
-
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseClone);
-        });
-
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    caches.match(event.request).then(cached => {
+      return cached || fetch(event.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return res;
+      });
+    })
   );
 });
