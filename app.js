@@ -205,3 +205,24 @@ function closeScanner() {
 
     document.getElementById("scannerContainer").style.display = "none";
 }
+
+function updateNetStatus() {
+
+    const el = document.getElementById("netStatus");
+
+    if (!el) return; // safety check
+
+    if (navigator.onLine) {
+        el.innerText = "🟢 Online Mode";
+        el.style.color = "green";
+    } else {
+        el.innerText = "🔴 Offline Mode";
+        el.style.color = "red";
+    }
+}
+
+window.addEventListener("online", updateNetStatus);
+window.addEventListener("offline", updateNetStatus);
+
+// run on page load
+updateNetStatus();
