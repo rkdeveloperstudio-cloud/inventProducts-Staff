@@ -30,7 +30,12 @@ function getDeviceName() {
     return navigator.userAgent;
 }
 
+let authChecked = false;
+
 async function checkDeviceAuthorization() {
+
+    if (authChecked) return true;
+    authChecked = true;
 
     const deviceId = getDeviceId();
     const deviceName = navigator.userAgent;
@@ -47,38 +52,44 @@ async function checkDeviceAuthorization() {
 
     const data = await res.json();
 
-    // not found → register
+    // NOT REGISTERED → AUTO CREATE
     if (!data || data.length === 0) {
 
-        await fetch(`${SUPABASE_URL}/rest/v1/authorized_devices`, {
-            method: "POST",
-            headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: "Bearer " + SUPABASE_KEY,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                device_id: deviceId,
-                device_name: deviceName,
-                allowed: true
-            })
-        });
+        const insertRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/authorized_devices`,
+            {
+                method: "POST",
+                headers: {
+                    apikey: SUPABASE_KEY,
+                    Authorization: "Bearer " + SUPABASE_KEY,
+                    "Content-Type": "application/json",
+                    Prefer: "return=representation"
+                },
+                body: JSON.stringify({
+                    device_id: deviceId,
+                    device_name: deviceName,
+                    allowed: true
+                })
+            }
+        );
+
+        const inserted = await insertRes.json();
+        console.log("Device registered:", inserted);
 
         return true;
     }
 
-    // blocked device
+    // BLOCKED DEVICE
     if (data[0].allowed === false) {
 
         document.body.innerHTML =
             "<h2 style='text-align:center;margin-top:50%'>Access Denied</h2>";
 
-        throw new Error("Blocked device");
+        throw new Error("Device blocked");
     }
 
     return true;
 }
-
 
 // =====================
 // INIT APP
@@ -215,7 +226,7 @@ async function searchByBarcode() {
     if (isOnline()) {
 
         const url =
-            `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date&barcode=eq.${encodeURIComponent(barcode)}`;
+            `${SUPABASE_URL}/rest/v1/products?select=barcode,description,qty_on_hand,latest_purchase_date&barcode=eq.${encodeURIComponent(barcode)}`;
 
         const res = await fetch(url, {
             headers: {
@@ -243,7 +254,7 @@ async function searchByKeyword() {
     if (isOnline()) {
 
         const url =
-            `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date&description=ilike.*${encodeURIComponent(keyword)}*`;
+            `${SUPABASE_URL}/rest/v1/products?select=barcode,description,qty_on_hand,latest_purchase_date&description=ilike.*${encodeURIComponent(keyword)}*`;
 
         const res = await fetch(url, {
             headers: {
@@ -357,8 +368,6 @@ function showResults(data) {
     </div>
 
     <hr>
-
-    <div><b>Price :</b> ${formatMoney(p.price)}</div>
 
     <div>
         <b>Qty :</b>
