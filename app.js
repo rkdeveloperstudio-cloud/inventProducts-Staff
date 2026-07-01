@@ -4,17 +4,17 @@ let codeReader = null;
 console.log("Inventory App Loaded");
 
 // =====================
-// SAFE GLOBAL EXPORT (AFTER FUNCTIONS DEFINED)
+// GLOBAL EXPORT (IMPORTANT)
 // =====================
 function exportGlobals() {
     window.searchByBarcode = searchByBarcode;
     window.searchByKeyword = searchByKeyword;
     window.openScanner = openScanner;
     window.closeScanner = closeScanner;
+    window.downloadOfflineData = downloadOfflineData;
 }
 
-// call at end
-setTimeout(exportGlobals, 0);
+document.addEventListener("DOMContentLoaded", exportGlobals);
 
 // =====================
 // BARCODE SEARCH
@@ -72,7 +72,9 @@ async function searchByKeyword() {
 
         const result = [];
 
-        store.openCursor().onsuccess = (e) => {
+        const req = store.openCursor();
+
+        req.onsuccess = (e) => {
             const cursor = e.target.result;
 
             if (cursor) {
@@ -80,10 +82,12 @@ async function searchByKeyword() {
                 if ((cursor.value.description || "")
                     .toLowerCase()
                     .includes(keyword.toLowerCase())) {
+
                     result.push(cursor.value);
                 }
 
                 cursor.continue();
+
             } else {
                 showResults(result);
             }
@@ -121,9 +125,9 @@ function showResults(data) {
 
     div.innerHTML = data.map(p => `
         <div class="product">
-            <b>${p.barcode}</b><br>
-            ${p.description}<br>
-            Price: ${p.price}
+            <b>${p.barcode || ""}</b><br>
+            ${p.description || ""}<br>
+            Price: ${p.price ?? 0}
         </div>
     `).join("");
 }
@@ -135,10 +139,13 @@ async function openScanner() {
 
     try {
 
-        if (!window.ZXing) {
-            alert("ZXing library not loaded");
+        if (!navigator.mediaDevices) {
+            alert("Camera not supported");
             return;
         }
+
+        // IMPORTANT: ask permission INSIDE function
+        await navigator.mediaDevices.getUserMedia({ video: true });
 
         document.getElementById("scannerContainer").style.display = "block";
 
@@ -151,12 +158,9 @@ async function openScanner() {
             return;
         }
 
-        // 🔥 BEST CAMERA (BACK CAMERA FIX)
-        let selectedDevice =
+        const selectedDevice =
             devices.find(d =>
-                d.label.toLowerCase().includes("back") ||
-                d.label.toLowerCase().includes("rear") ||
-                d.label.toLowerCase().includes("environment")
+                /back|rear|environment/i.test(d.label)
             ) || devices[0];
 
         codeReader.decodeFromVideoDevice(
@@ -173,29 +177,39 @@ async function openScanner() {
         );
 
     } catch (err) {
+        console.error(err);
         alert("Camera error: " + err.message);
     }
 }
 
 // =====================
 function closeScanner() {
+
     if (codeReader) {
         codeReader.reset();
         codeReader = null;
     }
+
     document.getElementById("scannerContainer").style.display = "none";
 }
 
 // =====================
+// DB
+// =====================
 function openDB() {
+
     return new Promise((resolve, reject) => {
 
         const req = indexedDB.open("InventoryDB", 1);
 
         req.onupgradeneeded = (e) => {
+
             db = e.target.result;
+
             if (!db.objectStoreNames.contains("products")) {
-                db.createObjectStore("products", { keyPath: "barcode" });
+                db.createObjectStore("products", {
+                    keyPath: "barcode"
+                });
             }
         };
 

@@ -140,26 +140,37 @@
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
-<script src="config.js"></script>
-<script src="db.js"></script>
-<script src="sync.js"></script>
-<script src="app.js"></script>
-
 <script>
-/* ✅ FIX GLOBAL ACCESS */
-window.searchByBarcode = searchByBarcode;
-window.searchByKeyword = searchByKeyword;
-window.openScanner = openScanner;
-window.closeScanner = closeScanner;
-window.downloadOfflineData = downloadOfflineData;
-
-/* ✅ SERVICE WORKER (FIXED) */
-if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("service-worker.js")
-        .then(() => console.log("SW registered"))
-        .catch(err => console.log("SW failed", err));
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject("Failed: " + src);
+        document.head.appendChild(s);
+    });
 }
-</script>
 
+(async function init() {
+    try {
+        await loadScript("config.js");
+        await loadScript("db.js");
+        await loadScript("sync.js");
+        await loadScript("app.js");
+
+        // SAFE GLOBAL EXPORT (AFTER EVERYTHING LOADED)
+        window.searchByBarcode = searchByBarcode;
+        window.searchByKeyword = searchByKeyword;
+        window.openScanner = openScanner;
+        window.closeScanner = closeScanner;
+        window.downloadOfflineData = downloadOfflineData;
+
+        console.log("All scripts loaded successfully");
+
+    } catch (err) {
+        console.error("APP FAILED TO LOAD:", err);
+    }
+})();
+</script>
 </body>
 </html>
