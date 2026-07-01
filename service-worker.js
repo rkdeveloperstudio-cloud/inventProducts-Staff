@@ -1,54 +1,111 @@
-const CACHE_NAME = "inventory-pwa-v2";
+const CACHE_NAME = "inventory-pwa-v3";
 
 const STATIC_FILES = [
-    "./",
-    "./index.html",
-    "./app.js",
-    "./db.js",
-    "./sync.js",
-    "./config.js",
-    "./manifest.json"
+  "./",
+  "./index.html",
+  "./app.js",
+  "./style.css",
+  "./manifest.json"
 ];
-// INSTALL
+
+// =====================
+// INSTALL EVENT
+// =====================
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_FILES))
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(STATIC_FILES);
+    })
   );
+
+  // Force immediate activation
   self.skipWaiting();
 });
 
-// ACTIVATE
+// =====================
+// ACTIVATE EVENT
+// =====================
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => k !== CACHE_NAME ? caches.delete(k) : null))
-    )
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
   );
+
+  // Take control immediately
   self.clients.claim();
 });
 
-// FETCH
+// =====================
+// FETCH EVENT
+// =====================
 self.addEventListener("fetch", event => {
 
-  if (event.request.mode === "navigate") {
+  const request = event.request;
+
+  // =====================
+  // 1. NAVIGATION REQUEST (Fix offline 404)
+  // =====================
+  if (request.mode === "navigate") {
     event.respondWith(
-      fetch("./index.html").catch(() => caches.match("./index.html"))
+      fetch(request).catch(() => caches.match("index.html"))
     );
     return;
   }
 
-  if (event.request.url.includes("/rest/v1/")) {
-    event.respondWith(fetch(event.request));
+  // =====================
+  // 2. SUPABASE API (Always network)
+  // =====================
+  if (request.url.includes("/rest/v1/")) {
+    event.respondWith(
+      fetch(request).catch(() => {
+        return new Response(
+          JSON.stringify({ error: "Offline - no network connection" }),
+          {
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      })
+    );
     return;
   }
 
+  // =====================
+  // 3. STATIC FILES (Cache First Strategy)
+  // =====================
+  const isStatic =
+    request.destination === "script" ||
+    request.destination === "style" ||
+    request.destination === "document" ||
+    request.destination === "image";
+
+  if (isStatic) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        return (
+          cached ||
+          fetch(request).then(networkResponse => {
+            return caches.open(CACHE_NAME).then(cache => {
+              cache.put(request, networkResponse.clone());
+              return networkResponse;
+            });
+          })
+        );
+      })
+    );
+    return;
+  }
+
+  // =====================
+  // 4. DEFAULT FALLBACK
+  // =====================
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      return cached || fetch(event.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return res;
-      });
-    })
+    fetch(request).catch(() => caches.match(request))
   );
 });

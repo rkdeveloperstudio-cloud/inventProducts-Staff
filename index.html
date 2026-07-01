@@ -2,13 +2,22 @@
 <html>
 <head>
     <title>Inventory PWA</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
     <link rel="manifest" href="manifest.json">
 
     <style>
-        body { font-family: Arial; padding: 12px; background: lightpink; }
-        input { width: 100%; padding: 10px; margin-bottom: 8px; }
+        body {
+            font-family: Arial;
+            padding: 12px;
+            background: lightskyblue;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
 
         button {
             width: 100%;
@@ -34,20 +43,27 @@
             border-radius: 6px;
         }
 
-        #scannerContainer {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            max-width: 420px;
-            height: 180px;
-            background: black;
-            border-radius: 12px;
-            overflow: hidden;
-            display: none;
-            z-index: 9999;
-        }
+        /* SCANNER */
+       #scannerContainer {
+    position: fixed;
+
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    width: 90%;
+    max-width: 420px;
+    height: 180px;
+
+    background: black;
+    border-radius: 12px;
+    overflow: hidden;
+
+    display: none;
+    z-index: 9999;
+
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
 
         #scannerVideo {
             width: 100%;
@@ -78,53 +94,35 @@
             color: white;
             border: none;
             padding: 5px;
+            font-size: 12px;
         }
     </style>
 </head>
 
 <body>
 
-<h2 style="text-align:center;">Inventory Staff</h2>
-
-<div id="netStatus" style="text-align:center;font-weight:bold;color:green;">
-    🟢 Online
-</div>
+<h3>Inventory Search</h3>
 
 <div class="box">
-
     <h4>Barcode Search</h4>
-
-    <input id="barcodeBox" placeholder="Enter barcode">
-
+    <input
+    id="barcodeBox"
+    placeholder="Enter barcode"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    spellcheck="false">
     <button onclick="searchByBarcode()">Search Barcode</button>
     <button onclick="openScanner()">Open Camera Scan</button>
-
-</div>
-
-<div class="box">
-
-    <h4>Offline Sync</h4>
-
-    <button onclick="downloadOfflineData()">
-        Download / Sync Products
-    </button>
-
-    <div id="syncStatus"
-         style="margin-top:8px;font-weight:bold;color:#1565c0;">
-        Status: Not synced
-    </div>
-
-    <progress id="syncProgress"
-              value="0"
-              max="100"
-              style="width:100%; margin-top:8px;">
-    </progress>
-
 </div>
 
 <div class="box">
     <h4>Keyword Search</h4>
-    <input id="keywordBox" placeholder="Enter keyword">
+    <input
+    id="keywordBox"
+    placeholder="Enter keyword"
+    autocomplete="off"
+    spellcheck="false">
     <button onclick="searchByKeyword()">Search</button>
 </div>
 
@@ -137,40 +135,15 @@
     <div class="scan-line"></div>
 </div>
 
-<!-- SCRIPTS -->
 <script src="https://unpkg.com/@zxing/library@latest"></script>
+<script src="app.js"></script>
 
 <script>
-function loadScript(src) {
-    return new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = src;
-        s.onload = resolve;
-        s.onerror = () => reject("Failed: " + src);
-        document.head.appendChild(s);
-    });
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("SW registered"))
+        .catch(err => console.log("SW failed", err));
 }
-
-(async function init() {
-    try {
-        await loadScript("config.js");
-        await loadScript("db.js");
-        await loadScript("sync.js");
-        await loadScript("app.js");
-
-        // SAFE GLOBAL EXPORT (AFTER EVERYTHING LOADED)
-        window.searchByBarcode = searchByBarcode;
-        window.searchByKeyword = searchByKeyword;
-        window.openScanner = openScanner;
-        window.closeScanner = closeScanner;
-        window.downloadOfflineData = downloadOfflineData;
-
-        console.log("All scripts loaded successfully");
-
-    } catch (err) {
-        console.error("APP FAILED TO LOAD:", err);
-    }
-})();
 </script>
 </body>
 </html>
