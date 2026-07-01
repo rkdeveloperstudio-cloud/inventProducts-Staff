@@ -44,7 +44,7 @@ function initDB() {
 async function downloadOfflineData() {
 
     if (!db) return alert("DB not ready");
-    if (!navigator.onLine) return alert("No internet");
+    if (!navigator.onLine) return alert("No internet connection");
 
     const modal = document.getElementById("syncModal");
     const bar = document.getElementById("syncBar");
@@ -52,69 +52,73 @@ async function downloadOfflineData() {
     const status = document.getElementById("syncStatus");
 
     modal.style.display = "block";
-
-    const pageSize = 1000;
-    let start = 0;
-    let totalSynced = 0;
-    let hasMore = true;
+    bar.style.width = "0%";
+    text.innerText = "Starting...";
+    status.innerText = "Downloading data...";
 
     try {
+
+        const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+
+        const res = await fetch(url, {
+            method: "GET",
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+            }
+        });
+
+        // ❗ IMPORTANT: HANDLE ERRORS PROPERLY
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error("Supabase Error:", errText);
+            status.innerText = "❌ Sync failed (API error)";
+            return;
+        }
+
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+            status.innerText = "No data found in database";
+            return;
+        }
+
+        const total = data.length;
+        let count = 0;
 
         const tx = db.transaction("products", "readwrite");
         const store = tx.objectStore("products");
 
-        while (hasMore) {
+        for (let item of data) {
 
-            const end = start + pageSize - 1;
+            store.put(item);
+            count++;
 
-            const url =
-                `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+            let percent = Math.floor((count / total) * 100);
 
-            const res = await fetch(url, {
-                method: "GET",
-                headers: {
-                    apikey: SUPABASE_KEY,
-                    Authorization: "Bearer " + SUPABASE_KEY,
-                    Range: `${start}-${end}`,
-                    Prefer: "count=exact"
-                }
-            });
-
-            if (!res.ok) {
-                const errText = await res.text();
-                console.error("Sync Error:", errText);
-                throw new Error("Supabase request failed: " + res.status);
-            }
-
-            const data = await res.json();
-
-            if (!data || data.length === 0) {
-                hasMore = false;
-                break;
-            }
-
-            data.forEach(item => store.put(item));
-
-            totalSynced += data.length;
-
-            text.innerText = `Synced: ${totalSynced} records`;
-
-            // IMPORTANT: don't fake 80000 anymore
-            bar.style.width = "100%";
-
-            start += pageSize;
+            bar.style.width = percent + "%";
+            text.innerText = `${count} / ${total}`;
         }
 
         tx.oncomplete = function () {
             status.innerText = "✔ Sync Completed Successfully";
-            setTimeout(() => modal.style.display = "none", 2000);
+
+            setTimeout(() => {
+                modal.style.display = "none";
+            }, 1500);
+        };
+
+        tx.onerror = function (e) {
+            console.error("IndexedDB error:", e);
+            status.innerText = "❌ Local DB error";
         };
 
     } catch (err) {
         console.error(err);
-        status.innerText = "❌ Sync Failed (Check Console)";
+        status.innerText = "❌ Sync failed (network or server error)";
     }
 }
+
 
 // =====================
 // CHECK ONLINE STATUS
