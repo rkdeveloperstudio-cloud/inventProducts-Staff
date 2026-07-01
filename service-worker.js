@@ -1,13 +1,14 @@
 const CACHE_NAME = "inventory-pwa-v2";
 
 const STATIC_FILES = [
-  "./",
-  "./index.html",
-  "./app.js",
-  "./style.css",
-  "./manifest.json"
+    "./",
+    "./index.html",
+    "./app.js",
+    "./db.js",
+    "./sync.js",
+    "./config.js",
+    "./manifest.json"
 ];
-
 // INSTALL
 self.addEventListener("install", event => {
   event.waitUntil(
