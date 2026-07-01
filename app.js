@@ -146,7 +146,7 @@ async function downloadOfflineData() {
 
     try {
 
-        const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+        const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,qty_on_hand,latest_purchase_date`;
 
         const res = await fetch(url, {
             method: "GET",
