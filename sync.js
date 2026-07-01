@@ -23,42 +23,55 @@ async function syncData() {
 
 async function downloadOfflineData() {
 
-    const status = document.getElementById("syncStatus");
-    const progress = document.getElementById("syncProgress");
+    try {
 
-    status.innerText = "Syncing started...";
-    progress.value = 0;
+        const status = document.getElementById("syncStatus");
+        const progress = document.getElementById("syncProgress");
 
-    if (!db) await openDB();
+        status.innerText = "Syncing started...";
+        progress.value = 0;
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
-        headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY
+        await openDB();
+
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+            }
+        });
+
+        const data = await res.json();
+
+        console.log("Products downloaded:", data.length);
+
+        const tx = db.transaction("products", "readwrite");
+        const store = tx.objectStore("products");
+
+        const total = data.length;
+
+        for (let i = 0; i < total; i++) {
+
+            store.put(data[i]);
+
+            progress.value = ((i + 1) / total) * 100;
+
+            status.innerText =
+                `Syncing ${i + 1} / ${total}`;
         }
-    });
 
-    const data = await res.json();
+        await new Promise(resolve => {
+            tx.oncomplete = resolve;
+        });
 
-    const tx = db.transaction("products", "readwrite");
-    const store = tx.objectStore("products");
+        status.innerText = "✅ Sync completed";
 
-    const total = data.length;
+    }
+    catch (err) {
 
-    for (let i = 0; i < total; i++) {
+        console.error(err);
 
-        store.put(data[i]);
+        alert(err.message);
 
-        const percent = Math.floor(((i + 1) / total) * 100);
-
-        progress.value = percent;
-        status.innerText = `Syncing... ${i + 1} / ${total}`;
-
-        if (i % 50 === 0) {
-            await new Promise(r => setTimeout(r, 1));
-        }
     }
 
-    progress.value = 100;
-    status.innerText = "✅ Sync completed successfully";
 }
