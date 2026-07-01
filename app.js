@@ -53,9 +53,18 @@ async function downloadOfflineData() {
         return;
     }
 
-    const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+    // Show UI
+    const modal = document.getElementById("syncModal");
+    const bar = document.getElementById("syncBar");
+    const text = document.getElementById("syncText");
+    const status = document.getElementById("syncStatus");
+
+    modal.style.display = "block";
 
     try {
+
+        const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+
         const res = await fetch(url, {
             headers: {
                 apikey: SUPABASE_KEY,
@@ -65,29 +74,36 @@ async function downloadOfflineData() {
 
         const data = await res.json();
 
-        if (!data || data.length === 0) {
-            alert("No data found to sync");
-            return;
-        }
+        const total = data.length;
+        let count = 0;
 
         const tx = db.transaction("products", "readwrite");
         const store = tx.objectStore("products");
 
-        data.forEach(item => {
+        for (let item of data) {
+
             store.put(item);
-        });
+            count++;
+
+            let percent = Math.floor((count / total) * 100);
+
+            bar.style.width = percent + "%";
+            text.innerText = `${count} / ${total}`;
+        }
 
         tx.oncomplete = function () {
-            alert("Data downloaded successfully for offline use");
-            console.log("Offline sync completed:", data.length);
+            status.innerText = "✔ Sync Completed Successfully";
+
+            setTimeout(() => {
+                modal.style.display = "none";
+            }, 1500);
         };
 
     } catch (err) {
         console.error(err);
-        alert("Sync failed");
+        status.innerText = "❌ Sync Failed";
     }
 }
-
 // =====================
 // CHECK ONLINE STATUS
 // =====================
