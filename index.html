@@ -7,17 +7,8 @@
     <link rel="manifest" href="manifest.json">
 
     <style>
-        body {
-            font-family: Arial;
-            padding: 12px;
-            background: lightpink;
-        }
-
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 8px;
-        }
+        body { font-family: Arial; padding: 12px; background: lightpink; }
+        input { width: 100%; padding: 10px; margin-bottom: 8px; }
 
         button {
             width: 100%;
@@ -95,7 +86,7 @@
 
 <h2 style="text-align:center;">Inventory Staff</h2>
 
-<div id="status" style="text-align:center; font-weight:bold; color:green;">
+<div id="netStatus" style="text-align:center;font-weight:bold;color:green;">
     🟢 Online
 </div>
 
@@ -130,11 +121,10 @@
     </progress>
 
 </div>
+
 <div class="box">
     <h4>Keyword Search</h4>
-
     <input id="keywordBox" placeholder="Enter keyword">
-
     <button onclick="searchByKeyword()">Search</button>
 </div>
 
@@ -147,7 +137,7 @@
     <div class="scan-line"></div>
 </div>
 
-<!-- SCRIPTS (IMPORTANT ORDER) -->
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
 <script src="config.js"></script>
@@ -156,6 +146,14 @@
 <script src="app.js"></script>
 
 <script>
+/* ✅ FIX GLOBAL ACCESS */
+window.searchByBarcode = searchByBarcode;
+window.searchByKeyword = searchByKeyword;
+window.openScanner = openScanner;
+window.closeScanner = closeScanner;
+window.downloadOfflineData = downloadOfflineData;
+
+/* ✅ SERVICE WORKER (FIXED) */
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("service-worker.js")
         .then(() => console.log("SW registered"))

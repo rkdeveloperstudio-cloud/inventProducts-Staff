@@ -1,77 +1,168 @@
-async function syncData() {
+// =====================
+// CONFIG (must exist globally from config.js)
+// =====================
+let db = null;
 
-    if (!navigator.onLine) {
-        alert("No internet for sync");
-        return;
-    }
+// =====================
+// OPEN DB SAFELY
+// =====================
+async function openDB() {
+    return new Promise((resolve, reject) => {
 
-    const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand`;
+        const request = indexedDB.open("InventoryDB", 1);
 
-    const res = await fetch(url, {
-        headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY
-        }
+        request.onupgradeneeded = function (e) {
+            db = e.target.result;
+
+            if (!db.objectStoreNames.contains("products")) {
+                const store = db.createObjectStore("products", {
+                    keyPath: "barcode"
+                });
+
+                store.createIndex("description", "description", {
+                    unique: false
+                });
+            }
+        };
+
+        request.onsuccess = function (e) {
+            db = e.target.result;
+            resolve(db);
+        };
+
+        request.onerror = reject;
     });
-
-    const data = await res.json();
-
-    await saveProducts(data);
-
-    alert("Offline data synced!");
 }
 
+// =====================
+// DOWNLOAD + SYNC (MAIN)
+// =====================
 async function downloadOfflineData() {
+
+    if (!navigator.onLine) {
+        alert("No internet connection.");
+        return;
+    }
 
     try {
 
         const status = document.getElementById("syncStatus");
         const progress = document.getElementById("syncProgress");
 
-        status.innerText = "Syncing started...";
+        status.innerText = "Preparing sync...";
         progress.value = 0;
 
-        await openDB();
+        if (!db) await openDB();
 
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
-            headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: "Bearer " + SUPABASE_KEY
+        // =============================
+        // STEP 1: GET TOTAL COUNT
+        // =============================
+        const countRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/products?select=barcode`,
+            {
+                method: "GET",
+                headers: {
+                    apikey: SUPABASE_KEY,
+                    Authorization: "Bearer " + SUPABASE_KEY,
+                    Prefer: "count=exact"
+                }
             }
-        });
+        );
 
-        const data = await res.json();
+        const contentRange = countRes.headers.get("content-range");
 
-        console.log("Products downloaded:", data.length);
-
-        const tx = db.transaction("products", "readwrite");
-        const store = tx.objectStore("products");
-
-        const total = data.length;
-
-        for (let i = 0; i < total; i++) {
-
-            store.put(data[i]);
-
-            progress.value = ((i + 1) / total) * 100;
-
-            status.innerText =
-                `Syncing ${i + 1} / ${total}`;
+        if (!contentRange) {
+            throw new Error("Cannot fetch total count from Supabase");
         }
 
-        await new Promise(resolve => {
-            tx.oncomplete = resolve;
-        });
+        const totalRecords = parseInt(contentRange.split("/")[1]);
 
-        status.innerText = "✅ Sync completed";
+        status.innerText = `Total Products: ${totalRecords}`;
 
-    }
-    catch (err) {
+        // =============================
+        // STEP 2: CLEAR OLD DATA
+        // =============================
+        let tx = db.transaction("products", "readwrite");
+        let store = tx.objectStore("products");
+        store.clear();
 
+        await txComplete(tx);
+
+        // =============================
+        // STEP 3: BATCH DOWNLOAD
+        // =============================
+        const batchSize = 1000;
+        let downloaded = 0;
+
+        while (downloaded < totalRecords) {
+
+            const start = downloaded;
+            const end = Math.min(downloaded + batchSize - 1, totalRecords - 1);
+
+            status.innerText = `Downloading ${start} - ${end}`;
+
+            const res = await fetch(
+                `${SUPABASE_URL}/rest/v1/products?select=*`,
+                {
+                    method: "GET",
+                    headers: {
+                        apikey: SUPABASE_KEY,
+                        Authorization: "Bearer " + SUPABASE_KEY,
+                        Range: `${start}-${end}`
+                    }
+                }
+            );
+
+            const rows = await res.json();
+
+            if (!rows || rows.length === 0) break;
+
+            // =============================
+            // SAVE TO INDEXEDDB
+            // =============================
+            tx = db.transaction("products", "readwrite");
+            store = tx.objectStore("products");
+
+            for (const row of rows) {
+                store.put(row);
+            }
+
+            await txComplete(tx);
+
+            downloaded += rows.length;
+
+            progress.value = Math.floor((downloaded / totalRecords) * 100);
+
+            status.innerText = `Syncing ${downloaded} / ${totalRecords}`;
+
+            console.log(`Synced ${downloaded}/${totalRecords}`);
+        }
+
+        progress.value = 100;
+        status.innerText = `✅ Sync Completed (${downloaded})`;
+
+        alert(`Sync completed!\nTotal: ${downloaded}`);
+
+    } catch (err) {
         console.error(err);
-
-        alert(err.message);
-
+        alert("Sync Error: " + err.message);
     }
+}
 
+// =====================
+// SIMPLE SYNC WRAPPER
+// =====================
+async function syncData() {
+    return await downloadOfflineData();
+}
+
+// =====================
+// SAFE TX HELPER (VERY IMPORTANT)
+// =====================
+function txComplete(tx) {
+    return new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
 }

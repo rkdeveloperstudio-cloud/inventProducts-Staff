@@ -1,7 +1,7 @@
 let db = null;
-console.log("Inventory PWA Loaded - " + new Date().toLocaleString());
-
 let codeReader = null;
+
+console.log("Inventory App Loaded");
 
 // =====================
 // BARCODE SEARCH
@@ -11,37 +11,36 @@ async function searchByBarcode() {
     const barcode = document.getElementById("barcodeBox").value.trim();
     if (!barcode) return;
 
-    // OFFLINE MODE
-  if (!navigator.onLine) {
+    if (!navigator.onLine) {
+        if (!db) await openDB();
 
-    if (!db) await openDB();
+        const tx = db.transaction("products", "readonly");
+        const store = tx.objectStore("products");
 
-    const tx = db.transaction("products", "readonly");
-    const store = tx.objectStore("products");
+        const req = store.get(barcode);
 
-    const req = store.get(barcode);
+        const result = await new Promise(resolve => {
+            req.onsuccess = () => resolve(req.result ? [req.result] : []);
+        });
 
-    const result = await new Promise(resolve => {
-        req.onsuccess = () => resolve(req.result ? [req.result] : []);
-    });
+        showResults(result);
+        return;
+    }
 
-    showResults(result);
-    return;
-}
-
-    const url =
-        `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand&barcode=eq.${barcode}`;
-
-    const res = await fetch(url, {
-        headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY
+    const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/products?select=*&barcode=eq.${barcode}`,
+        {
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+            }
         }
-    });
+    );
 
     const data = await res.json();
     showResults(data);
 }
+
 // =====================
 // KEYWORD SEARCH
 // =====================
@@ -50,51 +49,45 @@ async function searchByKeyword() {
     const keyword = document.getElementById("keywordBox").value.trim();
     if (!keyword) return;
 
- if (!navigator.onLine) {
+    if (!navigator.onLine) {
+        if (!db) await openDB();
 
-    if (!db) await openDB();
+        const tx = db.transaction("products", "readonly");
+        const store = tx.objectStore("products");
 
-    const tx = db.transaction("products", "readonly");
-    const store = tx.objectStore("products");
-    const index = store.index("description");
+        const result = [];
 
-    const result = [];
+        store.openCursor().onsuccess = (e) => {
+            const cursor = e.target.result;
 
-    index.openCursor().onsuccess = function (event) {
-        const cursor = event.target.result;
-
-        if (cursor) {
-
-            if (cursor.value.description
-                ?.toLowerCase()
-                .includes(keyword.toLowerCase())) {
-
-                result.push(cursor.value);
+            if (cursor) {
+                if ((cursor.value.description || "")
+                    .toLowerCase()
+                    .includes(keyword.toLowerCase())) {
+                    result.push(cursor.value);
+                }
+                cursor.continue();
+            } else {
+                showResults(result);
             }
+        };
+        return;
+    }
 
-            cursor.continue();
-
-        } else {
-            showResults(result);
+    const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/products?select=*&description=ilike.*${keyword}*`,
+        {
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+            }
         }
-    };
-
-    return;
-}
-
-    const url =
-        `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand&description=ilike.*${keyword}*`;
-
-    const res = await fetch(url, {
-        headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY
-        }
-    });
+    );
 
     const data = await res.json();
     showResults(data);
 }
+
 // =====================
 // SHOW RESULTS
 // =====================
@@ -108,51 +101,24 @@ function showResults(data) {
         return;
     }
 
-    let html = "";
-
-    data.forEach(p => {
-
-        const qty = parseInt(p.qty_on_hand || 0);
-
-        const qtyColor =
-            qty < 0 ? "red" :
-            qty === 0 ? "gray" :
-            "green";
-        html += `
-<div class="product">
-
-    <div style="font-size:15px;font-weight:bold;color:#1565c0;">
-        ${p.barcode || ""}
-    </div>
-
-    <div style="font-size:18px;font-weight:bold;margin:8px 0;">
-        ${p.description || ""}
-    </div>
-
-    <hr>
-
-  <div><b>Price :</b> ${parseFloat(p.price || 0).toFixed(2)}</div>
-
-<div>
-    <b>Qty :</b>
-    <span style="color:${qtyColor};font-weight:bold;">
-        ${qty}
-    </span>
-</div>
-</div>`;
-    });
-
-    div.innerHTML = html;
+    div.innerHTML = data.map(p => `
+        <div class="product">
+            <b>${p.barcode}</b><br>
+            ${p.description}<br>
+            Price: ${p.price}
+        </div>
+    `).join("");
 }
+
 // =====================
-// OPEN CAMERA SCANNER
+// CAMERA SCANNER (FIXED)
 // =====================
 async function openScanner() {
 
     try {
 
-        if (!window.ZXing) {
-            alert("ZXing not loaded");
+        if (!navigator.mediaDevices) {
+            alert("Camera not supported");
             return;
         }
 
@@ -167,86 +133,47 @@ async function openScanner() {
             return;
         }
 
-        // prefer back camera
-        let back = devices.find(d =>
-            d.label.toLowerCase().includes("back") ||
-            d.label.toLowerCase().includes("rear") ||
-            d.label.toLowerCase().includes("environment")
-        );
-
-        const deviceId = back ? back.deviceId : devices[0].deviceId;
+        const deviceId = devices[0].deviceId;
 
         codeReader.decodeFromVideoDevice(deviceId, "scannerVideo", (result) => {
 
             if (result) {
                 document.getElementById("barcodeBox").value = result.text;
-
                 closeScanner();
                 searchByBarcode();
             }
         });
 
-    } catch (e) {
-        alert("Camera error: " + e.message);
+    } catch (err) {
+        alert("Camera error: " + err.message);
     }
 }
 
 // =====================
-// CLOSE SCANNER
-// =====================
 function closeScanner() {
-
     if (codeReader) {
         codeReader.reset();
         codeReader = null;
     }
-
     document.getElementById("scannerContainer").style.display = "none";
 }
 
-function updateNetStatus() {
-
-    const el = document.getElementById("netStatus");
-
-    if (!el) return; // safety check
-
-    if (navigator.onLine) {
-        el.innerText = "🟢 Online Mode";
-        el.style.color = "green";
-    } else {
-        el.innerText = "🔴 Offline Mode";
-        el.style.color = "red";
-    }
-}
-
-window.addEventListener("online", updateNetStatus);
-window.addEventListener("offline", updateNetStatus);
-
-// run on page load
-updateNetStatus();
-
+// =====================
 function openDB() {
     return new Promise((resolve, reject) => {
 
-        const request = indexedDB.open("InventoryDB", 1);
+        const req = indexedDB.open("InventoryDB", 1);
 
-        request.onupgradeneeded = function (e) {
+        req.onupgradeneeded = (e) => {
             db = e.target.result;
-
-            const store = db.createObjectStore("products", {
-                keyPath: "barcode"
-            });
-
-            store.createIndex("description", "description", {
-                unique: false
-            });
+            db.createObjectStore("products", { keyPath: "barcode" });
         };
 
-        request.onsuccess = function (e) {
+        req.onsuccess = (e) => {
             db = e.target.result;
             resolve(db);
         };
 
-        request.onerror = reject;
+        req.onerror = reject;
     });
 }
