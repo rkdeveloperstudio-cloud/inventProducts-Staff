@@ -33,7 +33,7 @@ function getDeviceName() {
 async function checkDeviceAuthorization() {
 
     const deviceId = getDeviceId();
-    const deviceName = getDeviceName();
+    const deviceName = navigator.userAgent;
 
     const checkUrl =
         `${SUPABASE_URL}/rest/v1/authorized_devices?device_id=eq.${encodeURIComponent(deviceId)}&select=device_id,allowed`;
@@ -47,16 +47,15 @@ async function checkDeviceAuthorization() {
 
     const data = await res.json();
 
-    // First time device
-    if (data.length === 0) {
+    // not found → register
+    if (!data || data.length === 0) {
 
         await fetch(`${SUPABASE_URL}/rest/v1/authorized_devices`, {
             method: "POST",
             headers: {
                 apikey: SUPABASE_KEY,
                 Authorization: "Bearer " + SUPABASE_KEY,
-                "Content-Type": "application/json",
-                Prefer: "return=minimal"
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 device_id: deviceId,
@@ -68,19 +67,17 @@ async function checkDeviceAuthorization() {
         return true;
     }
 
-    // Blocked
-    if (!data[0].allowed) {
+    // blocked device
+    if (data[0].allowed === false) {
 
-        alert("Network Error");
+        document.body.innerHTML =
+            "<h2 style='text-align:center;margin-top:50%'>Access Denied</h2>";
 
-        document.body.innerHTML = "";
-
-        throw new Error("Device blocked");
+        throw new Error("Blocked device");
     }
 
     return true;
 }
-
 
 
 // =====================
@@ -89,20 +86,13 @@ async function checkDeviceAuthorization() {
 window.addEventListener("load", async () => {
 
     try {
-
-        await checkDeviceAuthorization();
-
-        initDB();
-
+        const ok = await checkDeviceAuthorization();
     } catch (e) {
-
-        console.log(e);
-
+        console.warn("Auth failed - allowing offline mode");
     }
 
-});
-
-// =====================
+    initDB();
+});// =====================
 // INDEXEDDB SETUP
 // =====================
 function initDB() {
