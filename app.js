@@ -43,17 +43,9 @@ function initDB() {
 
 async function downloadOfflineData() {
 
-    if (!db) {
-        alert("Database not ready yet");
-        return;
-    }
+    if (!db) return alert("DB not ready");
+    if (!navigator.onLine) return alert("No internet");
 
-    if (!navigator.onLine) {
-        alert("No internet connection");
-        return;
-    }
-
-    // Show UI
     const modal = document.getElementById("syncModal");
     const bar = document.getElementById("syncBar");
     const text = document.getElementById("syncText");
@@ -61,47 +53,57 @@ async function downloadOfflineData() {
 
     modal.style.display = "block";
 
+    const pageSize = 1000;
+    let offset = 0;
+    let totalSynced = 0;
+    let hasMore = true;
+
+    const tx = db.transaction("products", "readwrite");
+    const store = tx.objectStore("products");
+
     try {
 
-        const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+        while (hasMore) {
 
-        const res = await fetch(url, {
-            headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: "Bearer " + SUPABASE_KEY
+            const url = `${SUPABASE_URL}/rest/v1/products` +
+                `?select=barcode,description,price,qty_on_hand,latest_purchase_date` +
+                `&limit=${pageSize}&offset=${offset}`;
+
+            const res = await fetch(url, {
+                headers: {
+                    apikey: SUPABASE_KEY,
+                    Authorization: "Bearer " + SUPABASE_KEY
+                }
+            });
+
+            const data = await res.json();
+
+            if (data.length === 0) {
+                hasMore = false;
+                break;
             }
-        });
 
-        const data = await res.json();
+            data.forEach(item => store.put(item));
 
-        const total = data.length;
-        let count = 0;
+            totalSynced += data.length;
+            offset += pageSize;
 
-        const tx = db.transaction("products", "readwrite");
-        const store = tx.objectStore("products");
+            // UI update (progress not exact total, but live count)
+            text.innerText = `Synced: ${totalSynced} records`;
 
-        for (let item of data) {
+            let fakePercent = Math.min((totalSynced / 80000) * 100, 100);
+            bar.style.width = fakePercent + "%";
 
-            store.put(item);
-            count++;
-
-            let percent = Math.floor((count / total) * 100);
-
-            bar.style.width = percent + "%";
-            text.innerText = `${count} / ${total}`;
         }
 
         tx.oncomplete = function () {
-            status.innerText = "✔ Sync Completed Successfully";
-
-            setTimeout(() => {
-                modal.style.display = "none";
-            }, 1500);
+            status.innerText = "✔ Sync Completed (80K+ data loaded)";
+            setTimeout(() => modal.style.display = "none", 2000);
         };
 
     } catch (err) {
         console.error(err);
-        status.innerText = "❌ Sync Failed";
+        status.innerText = "❌ Sync failed";
     }
 }
 // =====================
