@@ -54,31 +54,41 @@ async function downloadOfflineData() {
     modal.style.display = "block";
 
     const pageSize = 1000;
-    let offset = 0;
+    let start = 0;
     let totalSynced = 0;
     let hasMore = true;
 
-    const tx = db.transaction("products", "readwrite");
-    const store = tx.objectStore("products");
-
     try {
+
+        const tx = db.transaction("products", "readwrite");
+        const store = tx.objectStore("products");
 
         while (hasMore) {
 
-            const url = `${SUPABASE_URL}/rest/v1/products` +
-                `?select=barcode,description,price,qty_on_hand,latest_purchase_date` +
-                `&limit=${pageSize}&offset=${offset}`;
+            const end = start + pageSize - 1;
+
+            const url =
+                `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
 
             const res = await fetch(url, {
+                method: "GET",
                 headers: {
                     apikey: SUPABASE_KEY,
-                    Authorization: "Bearer " + SUPABASE_KEY
+                    Authorization: "Bearer " + SUPABASE_KEY,
+                    Range: `${start}-${end}`,
+                    Prefer: "count=exact"
                 }
             });
 
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("Sync Error:", errText);
+                throw new Error("Supabase request failed: " + res.status);
+            }
+
             const data = await res.json();
 
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 hasMore = false;
                 break;
             }
@@ -86,26 +96,26 @@ async function downloadOfflineData() {
             data.forEach(item => store.put(item));
 
             totalSynced += data.length;
-            offset += pageSize;
 
-            // UI update (progress not exact total, but live count)
             text.innerText = `Synced: ${totalSynced} records`;
 
-            let fakePercent = Math.min((totalSynced / 80000) * 100, 100);
-            bar.style.width = fakePercent + "%";
+            // IMPORTANT: don't fake 80000 anymore
+            bar.style.width = "100%";
 
+            start += pageSize;
         }
 
         tx.oncomplete = function () {
-            status.innerText = "✔ Sync Completed (80K+ data loaded)";
+            status.innerText = "✔ Sync Completed Successfully";
             setTimeout(() => modal.style.display = "none", 2000);
         };
 
     } catch (err) {
         console.error(err);
-        status.innerText = "❌ Sync failed";
+        status.innerText = "❌ Sync Failed (Check Console)";
     }
 }
+
 // =====================
 // CHECK ONLINE STATUS
 // =====================
