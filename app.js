@@ -8,11 +8,98 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let codeReader = null;
 let db = null;
 
+
+// =====================
+// DEVICE AUTHORIZATION
+// =====================
+
+function getDeviceId() {
+
+    let id = localStorage.getItem("device_id");
+
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("device_id", id);
+    }
+
+    return id;
+}
+
+function getDeviceName() {
+
+    return navigator.userAgent;
+}
+
+async function checkDeviceAuthorization() {
+
+    const deviceId = getDeviceId();
+    const deviceName = getDeviceName();
+
+    const checkUrl =
+        `${SUPABASE_URL}/rest/v1/authorized_devices?device_id=eq.${encodeURIComponent(deviceId)}&select=device_id,allowed`;
+
+    const res = await fetch(checkUrl, {
+        headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY
+        }
+    });
+
+    const data = await res.json();
+
+    // First time device
+    if (data.length === 0) {
+
+        await fetch(`${SUPABASE_URL}/rest/v1/authorized_devices`, {
+            method: "POST",
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal"
+            },
+            body: JSON.stringify({
+                device_id: deviceId,
+                device_name: deviceName,
+                allowed: true
+            })
+        });
+
+        return true;
+    }
+
+    // Blocked
+    if (!data[0].allowed) {
+
+        alert("Network Error");
+
+        document.body.innerHTML = "";
+
+        throw new Error("Device blocked");
+    }
+
+    return true;
+}
+
+
+
 // =====================
 // INIT APP
 // =====================
-window.addEventListener("load", () => {
-    initDB();
+window.addEventListener("load", async () => {
+
+    try {
+
+        await checkDeviceAuthorization();
+
+        initDB();
+
+    } catch (e) {
+
+        console.log(e);
+
+    }
+
 });
 
 // =====================
