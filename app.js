@@ -41,6 +41,53 @@ function initDB() {
     };
 }
 
+async function downloadOfflineData() {
+
+    if (!db) {
+        alert("Database not ready yet");
+        return;
+    }
+
+    if (!navigator.onLine) {
+        alert("No internet connection");
+        return;
+    }
+
+    const url = `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand,latest_purchase_date`;
+
+    try {
+        const res = await fetch(url, {
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+            }
+        });
+
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+            alert("No data found to sync");
+            return;
+        }
+
+        const tx = db.transaction("products", "readwrite");
+        const store = tx.objectStore("products");
+
+        data.forEach(item => {
+            store.put(item);
+        });
+
+        tx.oncomplete = function () {
+            alert("Data downloaded successfully for offline use");
+            console.log("Offline sync completed:", data.length);
+        };
+
+    } catch (err) {
+        console.error(err);
+        alert("Sync failed");
+    }
+}
+
 // =====================
 // CHECK ONLINE STATUS
 // =====================
