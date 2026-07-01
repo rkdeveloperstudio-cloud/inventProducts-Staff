@@ -4,6 +4,19 @@ let codeReader = null;
 console.log("Inventory App Loaded");
 
 // =====================
+// SAFE GLOBAL EXPORT (AFTER FUNCTIONS DEFINED)
+// =====================
+function exportGlobals() {
+    window.searchByBarcode = searchByBarcode;
+    window.searchByKeyword = searchByKeyword;
+    window.openScanner = openScanner;
+    window.closeScanner = closeScanner;
+}
+
+// call at end
+setTimeout(exportGlobals, 0);
+
+// =====================
 // BARCODE SEARCH
 // =====================
 async function searchByBarcode() {
@@ -12,6 +25,7 @@ async function searchByBarcode() {
     if (!barcode) return;
 
     if (!navigator.onLine) {
+
         if (!db) await openDB();
 
         const tx = db.transaction("products", "readonly");
@@ -28,7 +42,7 @@ async function searchByBarcode() {
     }
 
     const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/products?select=*&barcode=eq.${barcode}`,
+        `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand&barcode=eq.${barcode}`,
         {
             headers: {
                 apikey: SUPABASE_KEY,
@@ -50,6 +64,7 @@ async function searchByKeyword() {
     if (!keyword) return;
 
     if (!navigator.onLine) {
+
         if (!db) await openDB();
 
         const tx = db.transaction("products", "readonly");
@@ -61,21 +76,24 @@ async function searchByKeyword() {
             const cursor = e.target.result;
 
             if (cursor) {
+
                 if ((cursor.value.description || "")
                     .toLowerCase()
                     .includes(keyword.toLowerCase())) {
                     result.push(cursor.value);
                 }
+
                 cursor.continue();
             } else {
                 showResults(result);
             }
         };
+
         return;
     }
 
     const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/products?select=*&description=ilike.*${keyword}*`,
+        `${SUPABASE_URL}/rest/v1/products?select=barcode,description,price,qty_on_hand&description=ilike.*${keyword}*`,
         {
             headers: {
                 apikey: SUPABASE_KEY,
@@ -117,8 +135,8 @@ async function openScanner() {
 
     try {
 
-        if (!navigator.mediaDevices) {
-            alert("Camera not supported");
+        if (!window.ZXing) {
+            alert("ZXing library not loaded");
             return;
         }
 
@@ -133,16 +151,26 @@ async function openScanner() {
             return;
         }
 
-        const deviceId = devices[0].deviceId;
+        // 🔥 BEST CAMERA (BACK CAMERA FIX)
+        let selectedDevice =
+            devices.find(d =>
+                d.label.toLowerCase().includes("back") ||
+                d.label.toLowerCase().includes("rear") ||
+                d.label.toLowerCase().includes("environment")
+            ) || devices[0];
 
-        codeReader.decodeFromVideoDevice(deviceId, "scannerVideo", (result) => {
+        codeReader.decodeFromVideoDevice(
+            selectedDevice.deviceId,
+            "scannerVideo",
+            (result) => {
 
-            if (result) {
-                document.getElementById("barcodeBox").value = result.text;
-                closeScanner();
-                searchByBarcode();
+                if (result) {
+                    document.getElementById("barcodeBox").value = result.text;
+                    closeScanner();
+                    searchByBarcode();
+                }
             }
-        });
+        );
 
     } catch (err) {
         alert("Camera error: " + err.message);
@@ -166,7 +194,9 @@ function openDB() {
 
         req.onupgradeneeded = (e) => {
             db = e.target.result;
-            db.createObjectStore("products", { keyPath: "barcode" });
+            if (!db.objectStoreNames.contains("products")) {
+                db.createObjectStore("products", { keyPath: "barcode" });
+            }
         };
 
         req.onsuccess = (e) => {
