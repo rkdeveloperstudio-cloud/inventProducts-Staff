@@ -6,97 +6,514 @@
 
     <link rel="manifest" href="manifest.json">
 
-    <style>
-        body {
-            font-family: Arial;
-            padding: 12px;
-            background: #a7dbd9;
-        }
+   <style>
 
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 8px;
-        }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 10px;
-            background: #1b5c59;
-            color: white;
-            border: none;
-            border-radius: 6px;
-        }
-
-        .box {
-            background: white;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-        }
-
-        #results div {
-            background: white;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 6px;
-        }
-
-        /* SCANNER */
-       #scannerContainer {
-    position: fixed;
-
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-
-    width: 90%;
-    max-width: 420px;
-    height: 180px;
-
-    background: black;
-    border-radius: 12px;
-    overflow: hidden;
-
-    display: none;
-    z-index: 9999;
-
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
 }
 
-        #scannerVideo {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
 
-        .scan-line {
-            position: absolute;
-            width: 100%;
-            height: 2px;
-            background: cyan;
-            top: 50%;
-            animation: move 1.5s infinite;
-        }
+html,
+body{
 
-        @keyframes move {
-            0% { top: 10%; }
-            50% { top: 90%; }
-            100% { top: 10%; }
-        }
+    width:100%;
+    min-height:100%;
 
-        #closeBtn {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            background: white;
-            color: red;
-            border: none;
-            padding: 5px;
-            font-size: 12px;
-        }
-    </style>
+}
+
+
+
+body{
+
+    font-family:
+    "Segoe UI",
+    Arial,
+    sans-serif;
+
+
+    padding:15px;
+
+
+    color:#333;
+
+
+
+    background:
+
+    linear-gradient(
+        135deg,
+        #667eea,
+        #764ba2,
+        #00c6ff
+    );
+
+
+}
+
+
+
+/* TITLE */
+
+h3{
+
+
+    text-align:center;
+
+
+    color:white;
+
+
+    font-size:30px;
+
+
+    margin:15px 0 25px;
+
+
+    text-shadow:
+
+    0 5px 15px rgba(0,0,0,.3);
+
+
+}
+
+
+
+/* GLASS BOX */
+
+.box{
+
+
+    background:
+
+    rgba(255,255,255,0.18);
+
+
+
+    backdrop-filter:
+
+    blur(15px);
+
+
+
+    -webkit-backdrop-filter:
+
+    blur(15px);
+
+
+
+    padding:20px;
+
+
+    margin-bottom:18px;
+
+
+
+    border-radius:22px;
+
+
+
+    border:
+
+    1px solid rgba(255,255,255,.35);
+
+
+
+    box-shadow:
+
+
+    0 15px 35px rgba(0,0,0,.20);
+
+
+
+}
+
+
+
+/* LABEL */
+
+h4{
+
+
+    color:white;
+
+
+    margin-bottom:12px;
+
+
+    font-size:18px;
+
+
+}
+
+
+
+/* INPUT */
+
+input{
+
+
+    width:100%;
+
+
+    padding:15px;
+
+
+    border:none;
+
+
+    outline:none;
+
+
+
+    border-radius:15px;
+
+
+
+    font-size:16px;
+
+
+
+    background:
+
+    rgba(255,255,255,.9);
+
+
+
+    box-shadow:
+
+
+    inset 0 2px 8px rgba(0,0,0,.15);
+
+
+
+}
+
+
+
+/* BUTTON */
+
+button{
+
+
+    width:100%;
+
+
+    padding:16px;
+
+
+
+    margin-top:12px;
+
+
+
+    border:none;
+
+
+
+    border-radius:16px;
+
+
+
+    color:white;
+
+
+
+    font-size:17px;
+
+
+    font-weight:bold;
+
+
+
+    background:
+
+
+    rgba(255,255,255,.20);
+
+
+
+    backdrop-filter:
+
+    blur(10px);
+
+
+
+    -webkit-backdrop-filter:
+
+    blur(10px);
+
+
+
+    border:
+
+    1px solid rgba(255,255,255,.30);
+
+
+
+    box-shadow:
+
+
+    0 10px 25px rgba(0,0,0,.20);
+
+
+
+}
+
+
+
+button:active{
+
+
+    transform:scale(.97);
+
+
+}
+
+
+
+/* SEARCH RESULTS */
+
+#results div{
+
+
+    background:
+
+    rgba(255,255,255,.90);
+
+
+
+    padding:15px;
+
+
+    margin-bottom:12px;
+
+
+
+    border-radius:18px;
+
+
+
+    box-shadow:
+
+
+    0 10px 25px rgba(0,0,0,.15);
+
+
+
+}
+
+
+
+/* SCANNER WINDOW */
+
+
+#scannerContainer{
+
+
+    position:fixed;
+
+
+
+    top:50%;
+
+
+    left:50%;
+
+
+
+    transform:
+
+    translate(-50%,-50%);
+
+
+
+    width:90%;
+
+
+    max-width:420px;
+
+
+
+    height:220px;
+
+
+
+    background:black;
+
+
+
+    border-radius:25px;
+
+
+
+    overflow:hidden;
+
+
+
+    display:none;
+
+
+
+    z-index:9999;
+
+
+
+    box-shadow:
+
+
+    0 25px 50px rgba(0,0,0,.5);
+
+
+
+}
+
+
+
+#scannerVideo{
+
+
+    width:100%;
+
+
+    height:100%;
+
+
+    object-fit:cover;
+
+
+}
+
+
+
+.scan-line{
+
+
+    position:absolute;
+
+
+
+    width:100%;
+
+
+    height:3px;
+
+
+
+    background:#00ffcc;
+
+
+
+    animation:
+
+    move 1.5s infinite;
+
+
+}
+
+
+
+@keyframes move{
+
+
+0%{
+
+    top:10%;
+
+}
+
+
+50%{
+
+    top:90%;
+
+}
+
+
+100%{
+
+    top:10%;
+
+}
+
+
+}
+
+
+
+/* CLOSE BUTTON */
+
+#closeBtn{
+
+
+    position:absolute;
+
+
+    top:10px;
+
+
+    right:10px;
+
+
+
+    width:auto;
+
+
+
+    padding:8px 14px;
+
+
+
+    background:white;
+
+
+
+    color:red;
+
+
+
+    z-index:10;
+
+
+
+}
+
+
+
+/* SMALL MOBILE */
+
+@media(max-width:600px){
+
+
+body{
+
+    padding:12px;
+
+}
+
+
+
+h3{
+
+    font-size:26px;
+
+}
+
+
+
+.box{
+
+    padding:16px;
+
+}
+
+
+
+}
+
+
+</style>
 </head>
 
 <body>
